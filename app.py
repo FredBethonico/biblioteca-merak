@@ -47,7 +47,7 @@ def gerar_id(worksheet):
     return max(ids) + 1
 
 # Interface
-st.tittle("📚 Biblioteca Merak")
+st.title("📚 Biblioteca Merak")
 st.caption("Adicionar novo título ao acervo")
 
 # Definição das categorias disponíveis
