@@ -1,0 +1,10 @@
+# Ignora o arquivo JSON
+credentials.json
+client_secret.json
+
+# Ignora o arquivo de senhas do Streamlit
+.streamlit/secrets.toml
+
+# --- Python (Arquivos temporários e compilados) ---
+__pycache__/
+*.pyc

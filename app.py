@@ -20,7 +20,7 @@ def conectar_google_sheets():
         creds_dict = st.secrets["gcp_service_account"]
         creds = Credentials.from_service_account_info(creds_dict, scopes=scope)
     except Exception:
-        creds = Credentials.from_service_account_file("path.json", scopes=scope)
+        creds = Credentials.from_service_account_file("credentials.json", scopes=scope)
         
     client = gspread.authorize(creds)
     
