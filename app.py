@@ -25,7 +25,7 @@ def conectar_google_sheets():
     client = gspread.authorize(creds)
     
     # Abertura da planilha
-    sheet_id = st.secrets.get("SHEET_ID", "0")
+    sheet_id = st.secrets.get("SHEET_ID")
     if sheet_id:
         spreadsheet = client.open_by_key(sheet_id)
     else:
