@@ -53,12 +53,19 @@ st.caption("Adicionar novo título ao acervo")
 # Definição das categorias disponíveis
 try:
     ws = conectar_google_sheets()
-    categorias_existentes = sorted(list(set(ws.col_values(7))[1:]))
+    
+    todos_valores = ws.col_values(7)
+    if "Categoria" in todos_valores:
+        todos_valores.remove("Categoria")
+        
+    categorias_existentes = sorted(list(set(filter(None, todos_valores))))
+    
     if not categorias_existentes:
         categorias_existentes = ["Acadêmico", "Espírita", "História", "Literatura", "Não Ficção", "Poesia", "Religião", "Colorir"]
+
 except Exception as e:
-    st.error(f"Erro ao conectar com o banco de dados: {e}")
-    st.stop()
+    st.error(f"Erro ao carregar categorias: {e}")
+    categorias_existentes = ["Acadêmico", "Espírita", "História", "Literatura", "Não Ficção", "Poesia", "Religião", "Colorir"]
 
 with st.form(key="form_livro", clear_on_submit=True):
     nome_livro = st.text_input("Nome do Livro", placeholder="Digite o nome do livro")
