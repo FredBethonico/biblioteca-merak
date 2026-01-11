@@ -66,7 +66,27 @@ try:
 except Exception as e:
     st.error(f"Erro ao carregar categorias: {e}")
     categorias_existentes = ["Acadêmico", "Espírita", "História", "Literatura", "Não Ficção", "Poesia", "Religião", "Colorir"]
+    
+# Categoria
+st.markdown("### 1. Classificação")
+col_cat1, col_cat2 = st.columns(2)
 
+with col_cat1:
+    opcoes_categoria = categorias_existentes + ["➕ Nova Categoria"]
+    input_categoria = st.selectbox("Selecione a Categoria", options=opcoes_categoria)
+
+categoria_final = input_categoria
+
+if input_categoria == "➕ Nova Categoria":
+    with col_cat2:
+        nova_categoria_digitada = st.text_input("Digite o nome da nova categoria", placeholder="Ex: Culinária")
+        if nova_categoria_digitada:
+            categoria_final = nova_categoria_digitada.strip()
+        else:
+            categoria_final = "" # Garante que fique vazio se a pessoa não digitou nada ainda
+
+# Detalhes do Livro
+st.markdown("### 2. Detalhes do Livro")
 with st.form(key="form_livro", clear_on_submit=True):
     nome_livro = st.text_input("Nome do Livro", placeholder="Digite o nome do livro")
     
@@ -74,29 +94,23 @@ with st.form(key="form_livro", clear_on_submit=True):
     with col1:
         autor = st.text_input("Autor", placeholder="Digite o nome do autor")
         editora = st.text_input("Editora", placeholder="Digite o nome da editora")
-        ano = st.number_input("Ano Publicação", min_value=0, max_value=datetime.now().year + 1, step=1, format="%d")
-    
+        
     with col2:
-        opcoes_categoria = categorias_existentes + ["➕ Nova Categoria"]
-        
-        input_categoria = st.selectbox("Categoria", options=opcoes_categoria)
-        
-        if input_categoria == "➕ Nova Categoria":
-            nova_categoria_digitada = st.text_input("Digite a nova categoria", placeholder="Ex: Culinária")
-            categoria_final = nova_categoria_digitada.strip()                    
-        else:
-            categoria_final = input_categoria
-        
+        ano = st.number_input("Ano Publicação", min_value=0, max_value=datetime.now().year + 1, step=1, format="%d")
         edicao = st.number_input("Edição", min_value=1, step=1, value=1)
         quantidade = st.number_input("Quantidade", min_value=1, step=1, value=1)
         
-    submit = st.form_submit_button("Salvar na biblioteca", type="primary")
+    submit = st.form_submit_button("💾 Salvar na biblioteca", type="primary")
     
+# Processamento do formulário    
 if submit:
-    if not nome_livro:
-        st.warning("Por favor, preencha o nome do livro.")
-    elif not autor:
-        st.warning("Por favor, preencha o nome do autor.")
+    erros = []
+    if not nome_livro: erros.append("Nome do Livro")
+    if not autor: erros.append("Autor")
+    if not categoria_final: erros.append("Categoria (você selecionou 'Nova' mas não digitou o nome)")
+    
+    if erros:
+        st.warning(f"Por favor, preencha: {', '.join(erros)}")
     else:
         with st.spinner("Salvando livro na biblioteca..."):
             try:
@@ -109,12 +123,12 @@ if submit:
                     editora,
                     int(ano),
                     int(edicao),
-                    categoria_final,
+                    categoria_final, # Usa a variável definida fora do form
                     int(quantidade)
                 ]
                 
                 ws.append_row(nova_linha)
-                st.success(f"Livro '{nome_livro}' adicionado com sucesso! ID: {novo_id}.")
+                st.success(f"Livro '{nome_livro}' adicionado com sucesso na categoria '{categoria_final}'! (ID: {novo_id})")
                 
             except Exception as e:
                 st.error(f"Erro ao salvar o livro: {e}")
