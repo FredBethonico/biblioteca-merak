@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 import unicodedata
+import plotly.graph_objects as go
 from google.oauth2.service_account import Credentials
 from datetime import datetime
 
@@ -26,7 +27,11 @@ def conectar_google_sheets():
     client = gspread.authorize(creds)
     
     # Abertura da planilha
-    sheet_id = st.secrets.get("SHEET_ID")
+    try:
+        sheet_id = st.secrets.get("SHEET_ID")
+    except Exception:
+        sheet_id = None
+
     if sheet_id:
         spreadsheet = client.open_by_key(sheet_id)
     else:
@@ -47,10 +52,22 @@ def gerar_id(worksheet):
     
     return max(ids) + 1
 
+# Função para normalizar texto da busca
+def normalizar_texto(texto):
+    if not isinstance(texto, str):
+        return str(texto)
+    nfkd_form = unicodedata.normalize('NFKD', texto)
+    return "".join([c for c in nfkd_form if not unicodedata.combining(c)]).lower()
+
+@st.cache_data(ttl=600)
+def carregar_dados_biblioteca():
+    ws_local = conectar_google_sheets()
+    return pd.DataFrame(ws_local.get_all_records())
+
 # Interface
 st.title("📚 Biblioteca Merak")
 
-tab1, tab2 = st.tabs(["Adicionar Livro", "Ver Acervo"])
+tab1, tab2, tab3 = st.tabs(["Adicionar Livro", "Ver Acervo", "Análises"])
 
 with tab1:
     st.caption("Adicionar novo título ao acervo")
@@ -140,20 +157,7 @@ with tab1:
                 
 with tab2:
     st.caption("Consultar livros da biblioteca Merak")
-    
-    # Função para normalizar texto da busca
-    def normalizar_texto(texto):
-        if not isinstance(texto, str):
-            return str(texto)
-        nfkd_form = unicodedata.normalize('NFKD', texto)
-        return "".join([c for c in nfkd_form if not unicodedata.combining(c)]).lower()
-    
-    
-    @st.cache_data(ttl=600)
-    def carregar_dados_biblioteca():
-        ws_local = conectar_google_sheets()
-        return pd.DataFrame(ws_local.get_all_records())
-    
+
     df = carregar_dados_biblioteca()
     
     query = st.text_input("🔍 Buscar por título ou autor", placeholder="Digite o que deseja buscar")
@@ -177,3 +181,150 @@ with tab2:
             st.dataframe(resultados[colunas_visiveis].reset_index(drop=True), hide_index=True, use_container_width=True)
         else:
             st.info("Nenhum resultado encontrado.")
+
+with tab3:
+    st.caption("Panorama e indicadores do acervo")
+
+    # Cores e template visual (consistentes em todos os gráficos, adaptados ao tema)
+    tema_escuro = st.context.theme is not None and st.context.theme.type == "dark"
+
+    if tema_escuro:
+        AZUL = "#3987e5"
+        COR_SUPERFICIE = "#1a1a19"
+        COR_GRADE = "#2c2c2a"
+        COR_TEXTO = "#c3c2b7"
+    else:
+        AZUL = "#2a78d6"
+        COR_SUPERFICIE = "#fcfcfb"
+        COR_GRADE = "#e1e0d9"
+        COR_TEXTO = "#52514e"
+
+    FONTE = "system-ui, -apple-system, 'Segoe UI', sans-serif"
+
+    def estilizar_grafico(fig, altura, mostrar_grade_x=False, mostrar_grade_y=False):
+        fig.update_layout(
+            plot_bgcolor=COR_SUPERFICIE,
+            paper_bgcolor=COR_SUPERFICIE,
+            font=dict(color=COR_TEXTO, family=FONTE, size=13),
+            margin=dict(l=10, r=30, t=10, b=10),
+            height=altura,
+            showlegend=False,
+        )
+        fig.update_xaxes(showgrid=mostrar_grade_x, gridcolor=COR_GRADE, title=None, zeroline=False)
+        fig.update_yaxes(showgrid=mostrar_grade_y, gridcolor=COR_GRADE, title=None, zeroline=False)
+        return fig
+
+    def grafico_barra_horizontal(dados, rotulo_categoria, rotulo_valor):
+        fig = go.Figure(go.Bar(
+            x=dados[rotulo_valor],
+            y=dados[rotulo_categoria],
+            orientation="h",
+            marker_color=AZUL,
+            text=dados[rotulo_valor],
+            textposition="outside",
+            hovertemplate="%{y}: %{x} livro(s)<extra></extra>",
+        ))
+        fig.update_xaxes(range=[0, dados[rotulo_valor].max() * 1.2])
+        return estilizar_grafico(fig, altura=max(220, 40 * len(dados)), mostrar_grade_x=True)
+
+    df_analise = carregar_dados_biblioteca()
+
+    if df_analise.empty:
+        st.info("Ainda não há livros cadastrados para gerar análises.")
+    else:
+        df_analise = df_analise.copy()
+        df_analise["Quantidade"] = pd.to_numeric(df_analise["Quantidade"], errors="coerce").fillna(0)
+        df_analise["Ano de Publicação"] = pd.to_numeric(df_analise["Ano de Publicação"], errors="coerce")
+        df_analise["Categoria"] = df_analise["Categoria"].replace("", "Sem Categoria")
+
+        # KPIs
+        st.markdown("### 📊 Panorama Geral")
+        col1, col2, col3, col4, col5 = st.columns(5)
+        col1.metric("Títulos", len(df_analise))
+        col2.metric("Exemplares", int(df_analise["Quantidade"].sum()))
+        col3.metric("Autores", df_analise["Autor"].nunique())
+        col4.metric("Categorias", df_analise["Categoria"].nunique())
+        col5.metric("Editoras", df_analise["Editora"].replace("", pd.NA).nunique())
+
+        st.divider()
+
+        col_graf1, col_graf2 = st.columns(2)
+
+        with col_graf1:
+            st.markdown("#### Livros por Categoria")
+            contagem_categoria = (
+                df_analise["Categoria"].value_counts()
+                .rename_axis("Categoria")
+                .reset_index(name="Livros")
+                .sort_values("Livros", ascending=True)
+            )
+            st.plotly_chart(
+                grafico_barra_horizontal(contagem_categoria, "Categoria", "Livros"),
+                use_container_width=True,
+                config={"displayModeBar": False},
+            )
+
+        with col_graf2:
+            st.markdown("#### Top 10 Autores")
+            contagem_autor = (
+                df_analise["Autor"].value_counts().head(10)
+                .rename_axis("Autor")
+                .reset_index(name="Livros")
+                .sort_values("Livros", ascending=True)
+            )
+            st.plotly_chart(
+                grafico_barra_horizontal(contagem_autor, "Autor", "Livros"),
+                use_container_width=True,
+                config={"displayModeBar": False},
+            )
+
+        st.divider()
+
+        st.markdown("#### Top 10 Editoras")
+        contagem_editora = (
+            df_analise["Editora"].replace("", pd.NA).dropna().value_counts().head(10)
+            .rename_axis("Editora")
+            .reset_index(name="Livros")
+            .sort_values("Livros", ascending=True)
+        )
+        if not contagem_editora.empty:
+            st.plotly_chart(
+                grafico_barra_horizontal(contagem_editora, "Editora", "Livros"),
+                use_container_width=True,
+                config={"displayModeBar": False},
+            )
+        else:
+            st.info("Sem editoras cadastradas para esta análise.")
+
+        st.divider()
+
+        st.markdown("#### Publicações por Década")
+        df_decadas = df_analise.dropna(subset=["Ano de Publicação"])
+        df_decadas = df_decadas[df_decadas["Ano de Publicação"] > 0]
+
+        if not df_decadas.empty:
+            decadas = (df_decadas["Ano de Publicação"] // 10 * 10).astype(int)
+            contagem_decada = (
+                decadas.value_counts()
+                .rename_axis("Década")
+                .reset_index(name="Livros")
+                .sort_values("Década")
+            )
+            contagem_decada["Década"] = contagem_decada["Década"].astype(str) + "s"
+
+            fig_decada = go.Figure(go.Bar(
+                x=contagem_decada["Década"],
+                y=contagem_decada["Livros"],
+                marker_color=AZUL,
+                text=contagem_decada["Livros"],
+                textposition="outside",
+                hovertemplate="%{x}: %{y} livro(s)<extra></extra>",
+            ))
+            fig_decada.update_yaxes(range=[0, contagem_decada["Livros"].max() * 1.2])
+            st.plotly_chart(
+                estilizar_grafico(fig_decada, altura=350, mostrar_grade_y=True),
+                use_container_width=True,
+                config={"displayModeBar": False},
+            )
+        else:
+            st.info("Sem dados de ano de publicação suficientes para esta análise.")
