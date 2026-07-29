@@ -214,7 +214,14 @@ with tab3:
         fig.update_yaxes(showgrid=mostrar_grade_y, gridcolor=COR_GRADE, title=None, zeroline=False)
         return fig
 
-    def grafico_barra_horizontal(dados, rotulo_categoria, rotulo_valor):
+    def grafico_barra_horizontal(dados, rotulo_categoria, rotulo_valor, mostrar_percentual=False):
+        hovertemplate = "%{y}: %{x} livro(s)<extra></extra>"
+        customdata = None
+        if mostrar_percentual:
+            total = dados[rotulo_valor].sum()
+            customdata = (dados[rotulo_valor] / total * 100).round(1)
+            hovertemplate = "%{y}: %{x} livro(s) (%{customdata}%% do acervo)<extra></extra>"
+
         fig = go.Figure(go.Bar(
             x=dados[rotulo_valor],
             y=dados[rotulo_categoria],
@@ -222,7 +229,8 @@ with tab3:
             marker_color=AZUL,
             text=dados[rotulo_valor],
             textposition="outside",
-            hovertemplate="%{y}: %{x} livro(s)<extra></extra>",
+            hovertemplate=hovertemplate,
+            customdata=customdata,
         ))
         fig.update_xaxes(range=[0, dados[rotulo_valor].max() * 1.2])
         return estilizar_grafico(fig, altura=max(220, 40 * len(dados)), mostrar_grade_x=True)
@@ -237,14 +245,49 @@ with tab3:
         df_analise["Ano de Publicação"] = pd.to_numeric(df_analise["Ano de Publicação"], errors="coerce")
         df_analise["Categoria"] = df_analise["Categoria"].replace("", "Sem Categoria")
 
-        # KPIs
+        # KPIs (grade em HTML para se reorganizar sozinha em telas pequenas)
         st.markdown("### 📊 Panorama Geral")
-        col1, col2, col3, col4, col5 = st.columns(5)
-        col1.metric("Títulos", len(df_analise))
-        col2.metric("Exemplares", int(df_analise["Quantidade"].sum()))
-        col3.metric("Autores", df_analise["Autor"].nunique())
-        col4.metric("Categorias", df_analise["Categoria"].nunique())
-        col5.metric("Editoras", df_analise["Editora"].replace("", pd.NA).nunique())
+
+        COR_PRIMARIA = "#ffffff" if tema_escuro else "#0b0b0b"
+
+        indicadores = [
+            ("Títulos", len(df_analise)),
+            ("Exemplares", int(df_analise["Quantidade"].sum())),
+            ("Autores", df_analise["Autor"].nunique()),
+            ("Categorias", df_analise["Categoria"].nunique()),
+            ("Editoras", df_analise["Editora"].replace("", pd.NA).nunique()),
+        ]
+        tiles_html = "".join(
+            f'<div class="kpi-tile"><div class="kpi-label">{rotulo}</div>'
+            f'<div class="kpi-value">{valor}</div></div>'
+            for rotulo, valor in indicadores
+        )
+        st.markdown(
+            f"""
+            <style>
+            .kpi-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+                gap: 16px 12px;
+                margin: 4px 0 12px 0;
+            }}
+            .kpi-label {{
+                font-size: 0.85rem;
+                color: {COR_TEXTO};
+                white-space: nowrap;
+            }}
+            .kpi-value {{
+                font-size: 1.9rem;
+                font-weight: 600;
+                color: {COR_PRIMARIA};
+                font-variant-numeric: tabular-nums;
+                line-height: 1.3;
+            }}
+            </style>
+            <div class="kpi-grid">{tiles_html}</div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         st.divider()
 
@@ -259,7 +302,7 @@ with tab3:
                 .sort_values("Livros", ascending=True)
             )
             st.plotly_chart(
-                grafico_barra_horizontal(contagem_categoria, "Categoria", "Livros"),
+                grafico_barra_horizontal(contagem_categoria, "Categoria", "Livros", mostrar_percentual=True),
                 use_container_width=True,
                 config={"displayModeBar": False},
             )
