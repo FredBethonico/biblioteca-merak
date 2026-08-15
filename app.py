@@ -201,6 +201,10 @@ with tab3:
 
     FONTE = "system-ui, -apple-system, 'Segoe UI', sans-serif"
 
+    # Sem dragmode/scrollZoom: evita que o toque na área do gráfico (celular) seja
+    # interpretado como arraste de zoom em vez de rolagem da página.
+    CONFIG_GRAFICO = {"displayModeBar": False, "scrollZoom": False, "doubleClick": False}
+
     def estilizar_grafico(fig, altura, mostrar_grade_x=False, mostrar_grade_y=False):
         fig.update_layout(
             plot_bgcolor=COR_SUPERFICIE,
@@ -209,9 +213,10 @@ with tab3:
             margin=dict(l=10, r=30, t=10, b=10),
             height=altura,
             showlegend=False,
+            dragmode=False,
         )
-        fig.update_xaxes(showgrid=mostrar_grade_x, gridcolor=COR_GRADE, title=None, zeroline=False)
-        fig.update_yaxes(showgrid=mostrar_grade_y, gridcolor=COR_GRADE, title=None, zeroline=False)
+        fig.update_xaxes(showgrid=mostrar_grade_x, gridcolor=COR_GRADE, title=None, zeroline=False, fixedrange=True)
+        fig.update_yaxes(showgrid=mostrar_grade_y, gridcolor=COR_GRADE, title=None, zeroline=False, fixedrange=True)
         return fig
 
     def grafico_barra_horizontal(dados, rotulo_categoria, rotulo_valor, mostrar_percentual=False):
@@ -291,35 +296,33 @@ with tab3:
 
         st.divider()
 
-        col_graf1, col_graf2 = st.columns(2)
+        st.markdown("#### Livros por Categoria")
+        contagem_categoria = (
+            df_analise["Categoria"].value_counts()
+            .rename_axis("Categoria")
+            .reset_index(name="Livros")
+            .sort_values("Livros", ascending=True)
+        )
+        st.plotly_chart(
+            grafico_barra_horizontal(contagem_categoria, "Categoria", "Livros", mostrar_percentual=True),
+            use_container_width=True,
+            config=CONFIG_GRAFICO,
+        )
 
-        with col_graf1:
-            st.markdown("#### Livros por Categoria")
-            contagem_categoria = (
-                df_analise["Categoria"].value_counts()
-                .rename_axis("Categoria")
-                .reset_index(name="Livros")
-                .sort_values("Livros", ascending=True)
-            )
-            st.plotly_chart(
-                grafico_barra_horizontal(contagem_categoria, "Categoria", "Livros", mostrar_percentual=True),
-                use_container_width=True,
-                config={"displayModeBar": False},
-            )
+        st.divider()
 
-        with col_graf2:
-            st.markdown("#### Top 10 Autores")
-            contagem_autor = (
-                df_analise["Autor"].value_counts().head(10)
-                .rename_axis("Autor")
-                .reset_index(name="Livros")
-                .sort_values("Livros", ascending=True)
-            )
-            st.plotly_chart(
-                grafico_barra_horizontal(contagem_autor, "Autor", "Livros"),
-                use_container_width=True,
-                config={"displayModeBar": False},
-            )
+        st.markdown("#### Top 10 Autores")
+        contagem_autor = (
+            df_analise["Autor"].value_counts().head(10)
+            .rename_axis("Autor")
+            .reset_index(name="Livros")
+            .sort_values("Livros", ascending=True)
+        )
+        st.plotly_chart(
+            grafico_barra_horizontal(contagem_autor, "Autor", "Livros"),
+            use_container_width=True,
+            config=CONFIG_GRAFICO,
+        )
 
         st.divider()
 
@@ -334,7 +337,7 @@ with tab3:
             st.plotly_chart(
                 grafico_barra_horizontal(contagem_editora, "Editora", "Livros"),
                 use_container_width=True,
-                config={"displayModeBar": False},
+                config=CONFIG_GRAFICO,
             )
         else:
             st.info("Sem editoras cadastradas para esta análise.")
@@ -367,7 +370,7 @@ with tab3:
             st.plotly_chart(
                 estilizar_grafico(fig_decada, altura=350, mostrar_grade_y=True),
                 use_container_width=True,
-                config={"displayModeBar": False},
+                config=CONFIG_GRAFICO,
             )
         else:
             st.info("Sem dados de ano de publicação suficientes para esta análise.")
