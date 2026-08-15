@@ -8,3 +8,6 @@ client_secret.json
 # --- Python (Arquivos temporários e compilados) ---
 __pycache__/
 *.pyc
+
+# Configurações locais do Claude Code
+.claude/
