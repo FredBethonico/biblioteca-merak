@@ -256,6 +256,11 @@ with tab3:
         df_analise["Ano de Publicação"] = pd.to_numeric(df_analise["Ano de Publicação"], errors="coerce")
         df_analise["Categoria"] = df_analise["Categoria"].replace("", "Sem Categoria")
 
+        # Livros com múltiplos autores são cadastrados separados por ";" (ex: "Fulano; Beltrano").
+        # Aqui cada autor vira uma linha própria, pra contagens e gráficos considerarem todos.
+        autores_explodido = df_analise["Autor"].astype(str).str.split(";").explode().str.strip()
+        autores_explodido = autores_explodido[autores_explodido != ""]
+
         # KPIs (grade em HTML para se reorganizar sozinha em telas pequenas)
         st.markdown("### 📊 Panorama Geral")
 
@@ -264,7 +269,7 @@ with tab3:
         indicadores = [
             ("Títulos", int((df_analise["Quantidade"] >= 1).sum())),
             ("Exemplares", int(df_analise["Quantidade"].sum())),
-            ("Autores", df_analise["Autor"].nunique()),
+            ("Autores", autores_explodido.nunique()),
             ("Categorias", df_analise["Categoria"].nunique()),
             ("Editoras", df_analise["Editora"].replace("", pd.NA).nunique()),
         ]
@@ -319,7 +324,7 @@ with tab3:
 
         st.markdown("#### Top 10 Autores")
         contagem_autor = (
-            df_analise["Autor"].value_counts().head(10)
+            autores_explodido.value_counts().head(10)
             .rename_axis("Autor")
             .reset_index(name="Livros")
             .sort_values("Livros", ascending=True)
